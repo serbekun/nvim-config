@@ -2,6 +2,12 @@
 -- 🌙 Neovim Config by Sergey ✨
 -- ===============================
 
+vim.api.nvim_create_autocmd("VimEnter", {
+  callback = function()
+    vim.cmd("botright term")
+  end
+})
+
 -- ---------- main setting ----------
 vim.opt.number = true
 vim.opt.relativenumber = true
@@ -30,33 +36,39 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
--- ---------- plagins ----------
+-- ---------- plugins ----------
 require("lazy").setup({
-  -- 🌙 theme
-  { "folke/tokyonight.nvim", lazy = false, priority = 1000,
+  -- Oxocarbon Theme
+  {
+    "nyoom-engineering/oxocarbon.nvim",
+    lazy = false,
+    priority = 1000,
     config = function()
-      vim.cmd("colorscheme tokyonight")
-    end
+      vim.opt.background = "dark"
+      vim.cmd("colorscheme oxocarbon")
+    end,
   },
 
-  -- 🧩 Lualine status-bar
+  -- Lualine status-bar
   { "nvim-lualine/lualine.nvim", config = true },
 
-  -- 🌳 Treesitter
-  { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate",
+  -- Treesitter
+  {
+    "nvim-treesitter/nvim-treesitter",
+    build = ":TSUpdate",
     config = function()
       require("nvim-treesitter.configs").setup({
         ensure_installed = { "c", "cpp", "python", "rust", "lua" },
         highlight = { enable = true },
-        indent = { enable = true },
+        indent    = { enable = true },
       })
     end
   },
 
-  -- 🔍 Telescope
+  -- Telescope
   { "nvim-telescope/telescope.nvim", dependencies = { "nvim-lua/plenary.nvim" } },
 
-  -- 🧠 LSP, Mason, Completion
+  --  LSP, Mason, Completion
   { "williamboman/mason.nvim", config = true },
   { "williamboman/mason-lspconfig.nvim", config = true },
   { "neovim/nvim-lspconfig" },
@@ -66,14 +78,16 @@ require("lazy").setup({
   { "hrsh7th/cmp-path" },
   { "L3MON4D3/LuaSnip" },
 
-  -- 🗂️ file tree
+  --File tree
   { "nvim-tree/nvim-web-devicons" },
   { "nvim-tree/nvim-tree.lua", config = true },
+
 })
 
 -- ---------- setting LSP + code Completion ----------
-local cmp = require("cmp")
 
+-- Setup completion
+local cmp = require("cmp")
 cmp.setup({
   snippet = {
     expand = function(args)
@@ -83,6 +97,8 @@ cmp.setup({
   mapping = cmp.mapping.preset.insert({
     ["<C-Space>"] = cmp.mapping.complete(),
     ["<CR>"] = cmp.mapping.confirm({ select = true }),
+    ["<Tab>"] = cmp.mapping.select_next_item(),
+    ["<S-Tab>"] = cmp.mapping.select_prev_item(),
   }),
   sources = cmp.config.sources({
     { name = "nvim_lsp" },
@@ -91,25 +107,47 @@ cmp.setup({
   }),
 })
 
--- auto install lsp for need languages
+-- Setup Mason
 require("mason").setup()
 require("mason-lspconfig").setup({
-  ensure_installed = { "clangd", "pyright", "rust_analyzer" },
+  ensure_installed = { "clangd", "pyright", "rust_analyzer", "ltex" },
 })
 
+-- Capabilities for LSP
 local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
-local servers = { "clangd", "pyright", "rust_analyzer" }
-for _, server in ipairs(servers) do
-  vim.lsp.config[server] = {
-    capabilities = capabilities,
-  }
+-- Global on_attach function
+local on_attach = function(client, bufnr)
+  local bufmap = function(mode, lhs, rhs, desc)
+    vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
+  end
+
+  bufmap("n", "gd", vim.lsp.buf.definition, "Go to definition")
+  bufmap("n", "gr", vim.lsp.buf.references, "List references")
+  bufmap("n", "K", vim.lsp.buf.hover, "Hover documentation")
+  bufmap("n", "<leader>rn", vim.lsp.buf.rename, "Rename symbol")
+  bufmap("n", "<leader>ca", vim.lsp.buf.code_action, "Code action")
+  bufmap("n", "<leader>fd", vim.lsp.buf.format, "Format document")
 end
 
--- connect servers
-for _, server in ipairs(servers) do
-  vim.lsp.enable(server)
-end
+-- Setup LSP servers
+vim.lsp.config("clangd", {
+  capabilities = capabilities,
+  on_attach = on_attach,
+})
+
+vim.lsp.config("pyright", {
+  capabilities = capabilities,
+  on_attach = on_attach,
+})
+
+vim.lsp.config("rust_analyzer", {
+  capabilities = capabilities,
+  on_attach = on_attach,
+})
+
+
+-- LTeX (LanguageTool) уже настроен в plugins секции
 
 -- ---------- diagnostic and show errors ----------
 vim.diagnostic.config({
@@ -120,6 +158,7 @@ vim.diagnostic.config({
   signs = true,
   underline = true,
   update_in_insert = true,
+  severity_sort = true,
 })
 
 local signs = { Error = "✘ ", Warn = "▲ ", Hint = "⚑ ", Info = " " }
@@ -128,20 +167,25 @@ for type, icon in pairs(signs) do
   vim.fn.sign_define(hl, { text = icon, texthl = hl, numhl = "" })
 end
 
--- ---------- LSP hot key ----------
-vim.keymap.set("n", "gd", vim.lsp.buf.definition, { desc = "Go to definition" })
-vim.keymap.set("n", "gr", vim.lsp.buf.references, { desc = "Find all references" })
-vim.keymap.set("n", "K", vim.lsp.buf.hover, { desc = "Show documentation" })
-vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { desc = "Rename symbol" })
-vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, { desc = "Code actions" })
-
--- ---------- autoformat ---------
--- vim.api.nvim_create_autocmd("BufWritePre", {
---    callback = function()
---    vim.lsp.buf.format({ async = false })
--- end,
--- })
-
--- ---------- hot key for file tree ----------
+-- ---------- file tree hot key ----------
 vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<CR>", { desc = "file tree" })
 
+-- ---------- Select All & Save ----------
+vim.keymap.set("n", "<C-a>", "ggVG", { desc = "Select all" })
+vim.keymap.set("i", "<C-a>", "<Esc>ggVG", { desc = "Select all" })
+vim.keymap.set("v", "<C-a>", "<Esc>ggVG", { desc = "Select all" })
+
+vim.keymap.set("n", "<C-s>", ":w<CR>", { desc = "Save file" })
+vim.keymap.set("i", "<C-s>", "<Esc>:w<CR>a", { desc = "Save file" })
+vim.keymap.set("v", "<C-s>", "<Esc>:w<CR>", { desc = "Save file" })
+
+vim.keymap.set("n", "<leader>dd", vim.diagnostic.open_float, { desc = "Show diagnostic" })
+vim.keymap.set("n", "[d", vim.diagnostic.goto_prev, { desc = "Previous diagnostic" })
+vim.keymap.set("n", "]d", vim.diagnostic.goto_next, { desc = "Next diagnostic" })
+
+vim.keymap.set('n', '<A-Up>', ':m .-2<CR>==', { noremap = true, silent = true })
+vim.keymap.set('n', '<A-Down>', ':m .+1<CR>==', { noremap = true, silent = true })
+vim.keymap.set('i', '<A-Up>', '<Esc>:m .-2<CR>==gi', { noremap = true, silent = true })
+vim.keymap.set('i', '<A-Down>', '<Esc>:m .+1<CR>==gi', { noremap = true, silent = true })
+vim.keymap.set('v', '<A-Up>', ':m \'<-2<CR>gv=gv', { noremap = true, silent = true })
+vim.keymap.set('v', '<A-Down>', ':m \'>+1<CR>gv=gv', { noremap = true, silent = true })
