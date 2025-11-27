@@ -38,7 +38,7 @@ vim.opt.rtp:prepend(lazypath)
 
 -- ---------- plugins ----------
 require("lazy").setup({
-  -- Oxocarbon Theme
+  -- 🎨 Oxocarbon Theme
   {
     "nyoom-engineering/oxocarbon.nvim",
     lazy = false,
@@ -49,10 +49,10 @@ require("lazy").setup({
     end,
   },
 
-  -- Lualine status-bar
+  -- 🧩 Lualine status-bar
   { "nvim-lualine/lualine.nvim", config = true },
 
-  -- Treesitter
+  -- 🌳 Treesitter
   {
     "nvim-treesitter/nvim-treesitter",
     build = ":TSUpdate",
@@ -65,10 +65,10 @@ require("lazy").setup({
     end
   },
 
-  -- Telescope
+  -- 🔍 Telescope
   { "nvim-telescope/telescope.nvim", dependencies = { "nvim-lua/plenary.nvim" } },
 
-  --  LSP, Mason, Completion
+  -- 🧠 LSP, Mason, Completion
   { "williamboman/mason.nvim", config = true },
   { "williamboman/mason-lspconfig.nvim", config = true },
   { "neovim/nvim-lspconfig" },
@@ -78,7 +78,7 @@ require("lazy").setup({
   { "hrsh7th/cmp-path" },
   { "L3MON4D3/LuaSnip" },
 
-  --File tree
+  -- 🗂️ File tree
   { "nvim-tree/nvim-web-devicons" },
   { "nvim-tree/nvim-tree.lua", config = true },
 
