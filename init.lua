@@ -38,14 +38,18 @@ vim.opt.rtp:prepend(lazypath)
 
 -- ---------- plugins ----------
 require("lazy").setup({
-  -- 🎨 Oxocarbon Theme
+
+  -- 🎨 VSCode Theme
   {
-    "nyoom-engineering/oxocarbon.nvim",
+    "Mofiqul/vscode.nvim",
     lazy = false,
     priority = 1000,
     config = function()
-      vim.opt.background = "dark"
-      vim.cmd("colorscheme oxocarbon")
+      require("vscode").setup({
+        transparent = false,
+        italic_comments = true,
+      })
+      require("vscode").load()
     end,
   },
 
@@ -86,7 +90,6 @@ require("lazy").setup({
 
 -- ---------- setting LSP + code Completion ----------
 
--- Setup completion
 local cmp = require("cmp")
 cmp.setup({
   snippet = {
@@ -116,7 +119,7 @@ require("mason-lspconfig").setup({
 -- Capabilities for LSP
 local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
--- Global on_attach function
+-- Global on_attach
 local on_attach = function(client, bufnr)
   local bufmap = function(mode, lhs, rhs, desc)
     vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
@@ -146,15 +149,9 @@ vim.lsp.config("rust_analyzer", {
   on_attach = on_attach,
 })
 
-
--- LTeX (LanguageTool) уже настроен в plugins секции
-
 -- ---------- diagnostic and show errors ----------
 vim.diagnostic.config({
-  virtual_text = {
-    prefix = "●",
-    spacing = 2,
-  },
+  virtual_text = { prefix = "●", spacing = 2 },
   signs = true,
   underline = true,
   update_in_insert = true,
@@ -167,21 +164,24 @@ for type, icon in pairs(signs) do
   vim.fn.sign_define(hl, { text = icon, texthl = hl, numhl = "" })
 end
 
+vim.opt.backspace = { "indent", "eol", "start" }
+
+
 -- ---------- file tree hot key ----------
 vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<CR>", { desc = "file tree" })
 
 -- ---------- Select All & Save ----------
-vim.keymap.set("n", "<C-a>", "ggVG", { desc = "Select all" })
-vim.keymap.set("i", "<C-a>", "<Esc>ggVG", { desc = "Select all" })
-vim.keymap.set("v", "<C-a>", "<Esc>ggVG", { desc = "Select all" })
+vim.keymap.set("n", "<C-a>", "ggVG")
+vim.keymap.set("i", "<C-a>", "<Esc>ggVG")
+vim.keymap.set("v", "<C-a>", "<Esc>ggVG")
 
-vim.keymap.set("n", "<C-s>", ":w<CR>", { desc = "Save file" })
-vim.keymap.set("i", "<C-s>", "<Esc>:w<CR>a", { desc = "Save file" })
-vim.keymap.set("v", "<C-s>", "<Esc>:w<CR>", { desc = "Save file" })
+vim.keymap.set("n", "<C-s>", ":w<CR>")
+vim.keymap.set("i", "<C-s>", "<Esc>:w<CR>a")
+vim.keymap.set("v", "<C-s>", "<Esc>:w<CR>")
 
-vim.keymap.set("n", "<leader>dd", vim.diagnostic.open_float, { desc = "Show diagnostic" })
-vim.keymap.set("n", "[d", vim.diagnostic.goto_prev, { desc = "Previous diagnostic" })
-vim.keymap.set("n", "]d", vim.diagnostic.goto_next, { desc = "Next diagnostic" })
+vim.keymap.set("n", "<leader>dd", vim.diagnostic.open_float)
+vim.keymap.set("n", "[d", vim.diagnostic.goto_prev)
+vim.keymap.set("n", "]d", vim.diagnostic.goto_next)
 
 vim.keymap.set('n', '<A-Up>', ':m .-2<CR>==', { noremap = true, silent = true })
 vim.keymap.set('n', '<A-Down>', ':m .+1<CR>==', { noremap = true, silent = true })
