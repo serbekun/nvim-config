@@ -1,12 +1,8 @@
--- ===============================
--- 🌙 Neovim Config by Sergey ✨
--- ===============================
-
-vim.api.nvim_create_autocmd("VimEnter", {
-  callback = function()
-    vim.cmd("botright term")
-  end
-})
+-- vim.api.nvim_create_autocmd("VimEnter", {
+--   callback = function()
+--     vim.cmd("botright term")
+--   end
+-- })
 
 -- ---------- main setting ----------
 vim.opt.number = true
@@ -20,6 +16,9 @@ vim.opt.wrap = false
 vim.opt.cursorline = true
 vim.opt.clipboard = "unnamedplus"
 vim.g.mapleader = " "
+
+vim.opt.spell = true
+vim.opt.spelllang = 'en'
 
 -- ---------- hot key ----------
 vim.keymap.set("n", "<leader>w", ":w<CR>")
@@ -53,6 +52,12 @@ require("lazy").setup({
     end,
   },
 
+  {
+    "mfussenegger/nvim-jdtls",
+    -- Можно сделать lazy-load только для java-файлов
+    ft = { "java" },
+  },
+
   -- 🧩 Lualine status-bar
   { "nvim-lualine/lualine.nvim", config = true },
 
@@ -61,7 +66,7 @@ require("lazy").setup({
     "nvim-treesitter/nvim-treesitter",
     build = ":TSUpdate",
     config = function()
-      require("nvim-treesitter.configs").setup({
+      require("nvim-treesitter.config").setup({
         ensure_installed = { "c", "cpp", "python", "rust", "lua" },
         highlight = { enable = true },
         indent    = { enable = true },
@@ -84,9 +89,18 @@ require("lazy").setup({
 
   -- 🗂️ File tree
   { "nvim-tree/nvim-web-devicons" },
-  { "nvim-tree/nvim-tree.lua", config = true },
+  {
+    "nvim-tree/nvim-tree.lua",
+    dependencies = { "nvim-tree/nvim-web-devicons" },
+     keys = {
+       { "<leader>e", "<cmd>NvimTreeToggle<CR>", desc = "File tree" },
+     },
+     config = function()
+      require("nvim-tree").setup({})
+     end,
+    },
+  })
 
-})
 
 -- ---------- setting LSP + code Completion ----------
 
@@ -149,6 +163,117 @@ vim.lsp.config("rust_analyzer", {
   on_attach = on_attach,
 })
 
+-- ── Java (jdtls) ────────────────────────────────────────────────────────────────
+local jdtls_ok, jdtls = pcall(require, "jdtls")
+if not jdtls_ok then
+  print("nvim-jdtls not found — run :Lazy install mfussenegger/nvim-jdtls or :Lazy sync")
+  return
+end
+
+local jdtls_bin = vim.fn.stdpath("data") .. "/mason/bin/jdtls"
+
+if vim.fn.executable(jdtls_bin) ~= 1 then
+  print("jdtls binary not executable or missing → " .. jdtls_bin)
+  print("Run :MasonInstall jdtls  (then restart Neovim)")
+  return
+end
+
+-- Папка пакета jdtls (для glob и lombok)
+local jdtls_package_dir = vim.fn.stdpath("data") .. "/mason/packages/jdtls"
+
+-- Lombok (если файл не существует — lombok не установлен, убери строку -javaagent позже)
+local lombok_jar = jdtls_package_dir .. "/lombok.jar"
+
+-- Находим launcher JAR (самый свежий, версия меняется → glob обязателен!)
+local launcher_jar = vim.fn.glob(jdtls_package_dir .. "/plugins/org.eclipse.equinox.launcher_*.jar", false, true)[1]
+if not launcher_jar or launcher_jar == "" then
+  print("Equinox launcher JAR not found in " .. jdtls_package_dir .. "/plugins/")
+  print("Reinstall jdtls: :MasonUninstall jdtls :MasonInstall jdtls")
+  return
+end
+
+-- Configuration dir (для Linux — config_linux)
+local config_dir = jdtls_package_dir .. "/config_linux"
+if vim.fn.isdirectory(config_dir) ~= 1 then
+  print("config_linux not found → probably wrong OS or broken install")
+  return
+end
+
+-- Workspace — уникальный для каждого проекта (по имени папки проекта)
+local project_name = vim.fn.fnamemodify(vim.fn.getcwd(), ":p:h:t")
+local workspace_dir = vim.fn.stdpath("cache") .. "/jdtls/workspace/" .. project_name
+
+-- Команда запуска (самая стабильная версия)
+local cmd = {
+  "java",  -- или vim.fn.expand("$JAVA_HOME/bin/java") если JAVA_HOME настроен и нужен конкретный
+  "-Declipse.application=org.eclipse.jdt.ls.core.id1",
+  "-Dosgi.bundles.defaultStartLevel=4",
+  "-Declipse.product=org.eclipse.jdt.ls.core.product",
+  "-Dlog.level=ALL",
+  "-Xms1g",
+  "-Xmx2g",
+  "--add-modules=ALL-SYSTEM",
+  "--add-opens", "java.base/java.util=ALL-UNNAMED",
+  "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+}
+
+-- Lombok — добавляем только если файл существует
+if vim.fn.filereadable(lombok_jar) == 1 then
+  table.insert(cmd, "-javaagent:" .. lombok_jar)
+end
+
+-- Остальная часть cmd
+table.insert(cmd, "-jar")
+table.insert(cmd, launcher_jar)
+table.insert(cmd, "-configuration")
+table.insert(cmd, config_dir)
+table.insert(cmd, "-data")
+table.insert(cmd, workspace_dir)
+
+local config = {
+  cmd = cmd,
+  root_dir = jdtls.setup.find_root({
+    ".git",
+    "mvnw", "gradlew",
+    "pom.xml", "build.gradle", "build.gradle.kts",
+    "settings.gradle", "settings.gradle.kts"
+  }) or vim.fn.getcwd(),
+
+  settings = {
+    java = {
+      signatureHelp = { enabled = true },
+      contentProvider = { preferred = "fernflower" },  -- хороший декомпилятор
+      completion = {
+        favoriteStaticMembers = {
+          "java.util.Objects.*",
+          "java.lang.Math.*",
+          "org.junit.jupiter.api.Assertions.*",
+        },
+      },
+      sources = {
+        organizeImports = {
+          starThreshold = 9999,
+          staticStarThreshold = 9999,
+        },
+      },
+    },
+  },
+
+  capabilities = require("cmp_nvim_lsp").default_capabilities(),
+  on_attach = on_attach,  -- твой глобальный on_attach
+
+  init_options = {
+    bundles = {},  -- для java-test, java-debug добавь позже jars
+  },
+}
+
+-- Автозапуск
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "java",
+  callback = function()
+    require("jdtls").start_or_attach(config)
+  end,
+})
 -- ---------- diagnostic and show errors ----------
 vim.diagnostic.config({
   virtual_text = { prefix = "●", spacing = 2 },
@@ -165,10 +290,6 @@ for type, icon in pairs(signs) do
 end
 
 vim.opt.backspace = { "indent", "eol", "start" }
-
-
--- ---------- file tree hot key ----------
-vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<CR>", { desc = "file tree" })
 
 -- ---------- Select All & Save ----------
 vim.keymap.set("n", "<C-a>", "ggVG")
